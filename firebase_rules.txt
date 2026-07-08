@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // البيانات محفوظة تحت: vaults/{رمز-سري}/data/{المجموعة}
+    // القاعدة تسمح بالوصول فقط لمن يعرف الرمز السري (طوله 20 حرفًا فأكثر)
+    // من لا يعرف الرمز لا يستطيع تخمين المسار، ولا القراءة أو الكتابة خارجه.
+
+    match /vaults/{vaultCode}/data/{document} {
+      allow read, write: if vaultCode.size() >= 20;
+    }
+
+    // امنع أي وصول لأي مسار آخر
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
