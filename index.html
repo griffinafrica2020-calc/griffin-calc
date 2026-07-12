@@ -909,6 +909,7 @@ section.open .sec-b{display:block}
   <div style="background:#fff;border-radius:14px;padding:8px 14px"><img id="authLogo" src="" style="height:52px;display:block"></div>
   <div style="color:#fff;font-family:'Changa','IBM Plex Sans Arabic',sans-serif;font-weight:800;font-size:18px">حاسبة تكاليف الاستيراد</div>
   <div style="color:#B9C6DD;font-size:13px;font-weight:600">تسجيل الدخول الآمن</div>
+  <input id="authVault" style="width:220px;padding:13px;border-radius:12px;border:0;font-size:13px;text-align:center;font-family:inherit;direction:ltr;display:none" placeholder="رمز المزامنة السري (من المدير)">
   <input id="authUsername" autocomplete="username" style="width:220px;padding:13px;border-radius:12px;border:0;font-size:16px;text-align:center;font-family:inherit" placeholder="اسم المستخدم">
   <input id="authPassword" type="password" autocomplete="current-password" style="width:220px;padding:13px;border-radius:12px;border:0;font-size:16px;text-align:center;font-family:inherit" placeholder="كلمة المرور">
   <button onclick="doAuthLogin()" style="background:#E8A33D;border:0;border-radius:12px;padding:12px 48px;font-family:'Changa','IBM Plex Sans Arabic',sans-serif;font-weight:800;font-size:16px;color:#1B2B4B;cursor:pointer">دخول</button>
@@ -2945,8 +2946,15 @@ function toast(msg){
 }
 
 /* ================= نسخة النظام وسجل التحديثات ================= */
-const APP_VERSION = '2.11.1';
+const APP_VERSION = '2.12.0';
+const AUTH_REQUIRED = true;   /* فرض بوابة الدخول على كل الأجهزة — مبني في النسخة */
 const CHANGELOG = [
+  {v:'2.12.0', date:'2026-07', notes:[
+    '🔒 بوابة الدخول إجبارية على كل الأجهزة (مبنية في النسخة)',
+    'إصلاح: التصفح الخفي/جهاز جديد كان يفتح بلا دخول',
+    'الجهاز الجديد يُدخل رمز المزامنة السري + الحساب مرة واحدة',
+    'منع إيقاف الحماية من الواجهة'
+  ]},
   {v:'2.11.1', date:'2026-07', notes:[
     'جدول الدراسة صار قابلًا للتحرير مباشرة كالإكسل',
     'إضافة صنف وحذفه من داخل صفحة الدراسة',
@@ -3655,15 +3663,15 @@ async function persistDB(){
 
 function initDB(){
   loadSettings(); loadUsers();
-  /* المصادقة السحابية مفعّلة: أظهر بوابة الدخول فورًا قبل أي شيء */
-  if(authEnabled() && vaultCode()){
+  /* البوابة إجبارية بالنسخة (AUTH_REQUIRED) أو مفعّلة بالإعدادات */
+  if(AUTH_REQUIRED || (authEnabled() && vaultCode())){
     /* حمّل القشرة فقط، والبيانات بعد المصادقة */
     DB=[]; loadOrdersPlain(); loadCatalogPlain(); loadPaymentsPlain(); loadSyncMeta();
     initFirebase().then(()=>{
       /* راقب حالة المصادقة: إن كانت هناك جلسة سابقة، ادخل تلقائيًا */
       const {authFns, auth}=fb;
       authFns.onAuthStateChanged(auth, async(u)=>{
-        if(u){
+        if(u && vaultCode()){
           authUser=u;
           const profile=await loadAuthProfile(u.uid);
           currentUser={id:u.uid, name:profile?profile.username:'مستخدم', role:profile?profile.role:'staff', perms:profile?profile.perms:defaultStaffPerms()};
@@ -3748,6 +3756,8 @@ function showSummary(){
 function showAuthGate(){
   const img=document.querySelector('.logo-card img');
   if(img && $('authLogo')) $('authLogo').src=img.src;
+  /* جهاز جديد بلا رمز سري: اطلبه مع بيانات الدخول (مرة واحدة) */
+  if($('authVault')) $('authVault').style.display = vaultCode() ? 'none' : 'block';
   $('authGate').style.display='flex';
   setTimeout(()=>$('authUsername').focus(),200);
   $('authPassword').onkeydown=e=>{ if(e.key==='Enter') doAuthLogin(); };
@@ -3756,6 +3766,12 @@ function hideAuthGate(){ $('authGate').style.display='none'; }
 async function doAuthLogin(){
   const u=$('authUsername').value.trim(), p=$('authPassword').value;
   if(!u||!p){ $('authMsg').textContent='أدخل اسم المستخدم وكلمة المرور'; return; }
+  /* جهاز جديد: يجب رمز المزامنة السري أولًا (يعطيه المدير مرة واحدة) */
+  if(!vaultCode()){
+    const vc=($('authVault').value||'').trim();
+    if(vc.length<20){ $('authMsg').textContent='أدخل رمز المزامنة السري الصحيح (يرسله لك المدير)'; return; }
+    SETTINGS.vaultCode=vc; SETTINGS.cloudSync='1'; SETTINGS.authOn='1'; saveSettings();
+  }
   $('authMsg').textContent='⏳ جارٍ التحقق...';
   const res=await authSignIn(u,p);
   if(!res.ok){ $('authMsg').textContent=res.msg; $('authPassword').value=''; return; }
@@ -3824,10 +3840,8 @@ async function toggleAuth(on){
       SETTINGS.authOn='1'; saveSettings(); updateAuthUI();
     }
   } else {
-    if(currentUser && currentUser.role!=='admin'){ toast('فقط المدير يوقف المصادقة'); $('set_authOn').checked=true; return; }
-    if(!confirm('إيقاف المصادقة الإجبارية؟ سيفتح التطبيق بلا تسجيل دخول.')){ $('set_authOn').checked=true; return; }
-    SETTINGS.authOn='0'; saveSettings(); updateAuthUI();
-    toast('أُوقفت المصادقة');
+    alert('حماية الدخول مفروضة في صلب هذه النسخة على كل الأجهزة، ولا تُوقف من هنا.\nلإصدار نسخة بلا فرض، اطلب ذلك في التطوير.');
+    $('set_authOn').checked=true; return;
   }
 }
 function updateAuthUI(){
