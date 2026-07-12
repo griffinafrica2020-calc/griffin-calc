@@ -36,6 +36,10 @@ body{font-family:'IBM Plex Sans Arabic',Tahoma,sans-serif;background:var(--paper
 h1,h2,h3{font-family:'Changa','IBM Plex Sans Arabic',sans-serif}
 .num{font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:embed}
 .hidden{display:none!important}
+.sti{padding:5px 6px;border:1.5px solid var(--line);border-radius:7px;font-family:inherit;font-size:11.5px;background:#FBFCFE;text-align:center}
+.sti:focus{border-color:var(--sea);outline:none}
+td.nm .sti{text-align:right}
+body.dark .sti{background:#111C2E;border-color:#2E4266;color:#E4E9F1}
 .st-cell{background:#F7F9FC;border-radius:8px;padding:6px 8px;display:flex;flex-direction:column;gap:2px}
 /* جدول الدراسة الاحترافي */
 .study-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:12px}
@@ -2941,8 +2945,14 @@ function toast(msg){
 }
 
 /* ================= نسخة النظام وسجل التحديثات ================= */
-const APP_VERSION = '2.11.0';
+const APP_VERSION = '2.11.1';
 const CHANGELOG = [
+  {v:'2.11.1', date:'2026-07', notes:[
+    'جدول الدراسة صار قابلًا للتحرير مباشرة كالإكسل',
+    'إضافة صنف وحذفه من داخل صفحة الدراسة',
+    'اكتب الاسم/العبوة/الوزن/الكمية/السعر في الخلايا والأسعار تُحسب فورًا',
+    'التعديلات تنعكس تلقائيًا على قسم الأصناف بالشاشة الرئيسية'
+  ]},
   {v:'2.11.0', date:'2026-07', notes:[
     'مزامنة v3: وثيقة لكل حركة/أوردر — لا سقف 1 ميجا جماعي',
     'حذف آمن: المحذوف يُحذف عند الجميع ولا يعود (شواهد حذف)',
@@ -4229,12 +4239,12 @@ function openStudyView(){
 }
 function closeStudyView(){ $('studyPage').classList.remove('open'); document.body.style.overflow=''; }
 
-function studyRows(){
+function studyRows(includeEmpty){
   const fx = num($('fx').value)||1;
   const R = window._lastCalc || {goodsTotal:0,qtyTotal:0,freight:0,poolUSD:0};
   const wmDefault = num(STUDY.wm)||num(SETTINGS.wholesaleMargin)||20;
   const raDefault = num(STUDY.ra)||num(SETTINGS.retailAddDjf)||100;
-  return products.filter(p=>p.name||num(p.qty)>0).map(p=>{
+  return products.filter(p=>includeEmpty || p.name || num(p.qty)>0).map(p=>{
     const m = productMath(p, R.goodsTotal, R.qtyTotal, R.freight, R.poolUSD, fx);
     const costCarton = m ? m.costCarton : 0;
     const pcs = piecesOf(p);
@@ -4249,21 +4259,19 @@ function studyRows(){
   });
 }
 function renderStudy(){
-  const rows = studyRows();
-  if(rows.length===0){ $('studyTable').innerHTML='<div class="empty">لا توجد أصناف مكتملة.<br><br>لظهور الصنف في جدول الدراسة، أدخل في قسم الأصناف:<br><b>اسم الصنف + الكمية + سعر الشراء</b><br>(والعبوة مثل 4×12 لحساب سعر الحبة)</div>'; return; }
-  const fx = num($('fx').value)||1;
-  /* الإجماليات */
+  const rows = studyRows(true);   /* اعرض كل الأصناف حتى الفارغة للتحرير المباشر */
   let tQty=0,tTotal=0,tCostCarton=0;
   rows.forEach(r=>{ tQty+=r.qty; tTotal+=r.total; tCostCarton+=r.costCarton*r.qty; });
+  const inp=(id,field,val,ph,w,type)=>`<input class="sti" type="${type||'text'}" ${type==='number'?'inputmode="decimal"':''} value="${esc(String(val==null?'':val))}" placeholder="${ph||''}" style="width:${w}px" onchange="setStudyItem(${id},'${field}',this.value)">`;
   const trs = rows.map((r,i)=>`
     <tr>
       <td class="c">${i+1}</td>
-      <td class="nm">${esc(r.name)||'صنف'}</td>
-      <td class="c">${esc(r.pack)||'—'}</td>
-      <td class="c">${r.weight?esc(r.weight):'—'}</td>
-      <td class="c b">${fmt(r.qty)}</td>
-      <td class="c">${r.pcs}</td>
-      <td class="c">$${r.price.toFixed(2)}</td>
+      <td class="nm">${inp(r.p.id,'name',r.p.name,'اسم الصنف',150)}</td>
+      <td class="c">${inp(r.p.id,'pack',r.p.pack,'4×12',58)}</td>
+      <td class="c">${inp(r.p.id,'weight',r.p.weight,'40',46,'number')}</td>
+      <td class="c">${inp(r.p.id,'qty',r.p.qty,'0',56,'number')}</td>
+      <td class="c">${inp(r.p.id,'pieces',r.p.pieces,String(r.pcs||''),50,'number')}</td>
+      <td class="c">${inp(r.p.id,'price',r.p.price,'0.00',62,'number')}</td>
       <td class="c">$${fmt(Math.round(r.total))}</td>
       <td class="c">${fmt(Math.round(r.costCarton))}</td>
       <td class="c">${fmt(Math.round(r.pieceCost))}</td>
@@ -4271,16 +4279,17 @@ function renderStudy(){
       <td class="c rt">${fmt(Math.round(r.retailPiece))}</td>
       <td class="c wh">${fmt(Math.round(r.wholeCarton))}</td>
       <td class="c rt">${fmt(Math.round(r.retailCarton))}</td>
+      <td class="c"><button onclick="delStudyRow(${r.p.id})" style="border:0;background:transparent;color:#C0392B;font-size:15px;cursor:pointer">✕</button></td>
     </tr>`).join('');
   $('studyTable').innerHTML = `
-    <div class="hint" style="margin-bottom:6px">← اسحب الجدول جانبيًا لرؤية كل الأعمدة →</div>
+    <div class="hint" style="margin-bottom:6px">← اسحب الجدول جانبيًا · اكتب مباشرة في الخلايا (تُحسب الأسعار عند الانتقال للخلية التالية) →</div>
     <div class="study-scroll">
       <table class="study-tbl">
         <thead>
           <tr>
-            <th>#</th><th>اسم الصنف</th><th>العبوة</th><th>الوزن g</th><th>الكمية</th><th>حبات/كرتون</th>
-            <th>سعر الشراء</th><th>الإجمالي</th><th>تكلفة الكرتون</th><th>تكلفة الحبة</th>
-            <th class="wh">حبة جملة</th><th class="rt">حبة تجزئة</th><th class="wh">كرتون جملة</th><th class="rt">كرتون تجزئة</th>
+            <th>#</th><th>اسم الصنف</th><th>العبوة</th><th>وزن g</th><th>الكمية</th><th>حبات</th>
+            <th>سعر الشراء $</th><th>الإجمالي</th><th>تكلفة الكرتون</th><th>تكلفة الحبة</th>
+            <th class="wh">حبة جملة</th><th class="rt">حبة تجزئة</th><th class="wh">كرتون جملة</th><th class="rt">كرتون تجزئة</th><th></th>
           </tr>
         </thead>
         <tbody>${trs}</tbody>
@@ -4291,20 +4300,36 @@ function renderStudy(){
             <td colspan="2"></td>
             <td class="c b">$${fmt(Math.round(tTotal))}</td>
             <td class="c b">${fmt(Math.round(tCostCarton))}</td>
-            <td colspan="5"></td>
+            <td colspan="6"></td>
           </tr>
         </tfoot>
       </table>
     </div>
-    <div class="hint" style="margin-top:10px;margin-bottom:6px">تعديل الهامش أو زيادة التجزئة لكل صنف:</div>
+    <button class="addrow" style="margin-top:10px" onclick="addStudyRow()">＋ إضافة صنف</button>
+    <div class="hint" style="margin-top:10px;margin-bottom:6px">تعديل هامش الجملة % وزيادة التجزئة لكل صنف:</div>
     <div id="studyMargins"></div>`;
-  /* صفوف تعديل الهامش لكل صنف (منفصلة لسهولة اللمس) */
   $('studyMargins').innerHTML = rows.map(r=>`
     <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)">
       <div style="flex:1;font-size:12px;font-weight:600;color:var(--ink)">${esc(r.name)||'صنف'}</div>
       <input type="number" inputmode="decimal" value="${r.p.wMargin!==''&&r.p.wMargin!=null?r.p.wMargin:''}" placeholder="${num(STUDY.wm)||20}%" oninput="setStudyField(${r.p.id},'wMargin',this.value)" style="width:60px;padding:6px;border:1.5px solid var(--line);border-radius:8px;text-align:center;font-size:12px" title="هامش الجملة %">
       <input type="number" inputmode="decimal" value="${r.p.retailAdd!==''&&r.p.retailAdd!=null?r.p.retailAdd:''}" placeholder="${num(STUDY.ra)||100}ف" oninput="setStudyField(${r.p.id},'retailAdd',this.value)" style="width:60px;padding:6px;border:1.5px solid var(--line);border-radius:8px;text-align:center;font-size:12px" title="زيادة التجزئة">
     </div>`).join('');
+}
+function setStudyItem(id, field, val){
+  const p=products.find(x=>x.id===id); if(!p) return;
+  p[field]=val;
+  renderProducts();   /* حدّث الشاشة الرئيسية أيضًا */
+  calc();             /* يعيد الحساب ويستدعي renderStudy تلقائيًا */
+}
+function addStudyRow(){
+  addProduct();       /* يضيف للمصفوفة الموحدة ويعيد الرسم عبر calc */
+  renderStudy();
+  setTimeout(()=>{ const sc=document.querySelector('.study-scroll'); if(sc) sc.scrollIntoView({behavior:'smooth',block:'end'}); },100);
+}
+function delStudyRow(id){
+  if(products.length<=1){ toast('صنف واحد على الأقل'); return; }
+  products=products.filter(x=>x.id!==id);
+  renderProducts(); calc(); renderStudy();
 }
 function setStudyField(id, field, val){
   const p=products.find(x=>x.id===id); if(!p) return;
