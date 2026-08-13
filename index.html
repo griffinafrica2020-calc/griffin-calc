@@ -929,6 +929,7 @@ section.open .sec-b{display:block}
   <input id="authPassword" type="password" autocomplete="current-password" style="width:220px;padding:13px;border-radius:12px;border:0;font-size:16px;text-align:center;font-family:inherit" placeholder="كلمة المرور">
   <button onclick="doAuthLogin()" style="background:#E8A33D;border:0;border-radius:12px;padding:12px 48px;font-family:'Changa','IBM Plex Sans Arabic',sans-serif;font-weight:800;font-size:16px;color:#1B2B4B;cursor:pointer">دخول</button>
   <div id="authMsg" style="color:#FF9B9B;font-size:13px;min-height:18px;text-align:center;max-width:260px"></div>
+  <a id="authVaultToggle" onclick="showVaultField()" style="color:#B9C6DD;font-size:12.5px;text-decoration:underline;cursor:pointer;display:none">إدخال / تغيير رمز المزامنة السري</a>
 </div>
 
 <!-- صفحة ذمم الموردين (المدفوعات) -->
@@ -2961,9 +2962,20 @@ function toast(msg){
 }
 
 /* ================= نسخة النظام وسجل التحديثات ================= */
-const APP_VERSION = '2.13.0';
+const APP_VERSION = '2.14.1';
 const AUTH_REQUIRED = true;   /* فرض بوابة الدخول على كل الأجهزة — مبني في النسخة */
 const CHANGELOG = [
+  {v:'2.14.1', date:'2026-07', notes:[
+    'إصلاح الدخول: يمكن دائمًا إدخال/تصحيح رمز المزامنة من شاشة الدخول',
+    'حساب أُنشئ من لوحة Firebase يحصل على صلاحياته تلقائيًا (أول حساب = مدير)',
+    'رسائل خطأ أوضح عند فشل الدخول'
+  ]},
+  {v:'2.14.0', date:'2026-07', notes:[
+    '🔄 إصلاح مهم: التعديلات أثناء انقطاع الإنترنت تُرفع تلقائيًا عند عودته',
+    'طابور مزامنة محفوظ — لا يضيع حتى لو أُغلق التطبيق',
+    'إعادة محاولة تلقائية كل 45 ثانية وعند فتح التطبيق',
+    'مؤشر يوضّح عدد التعديلات المنتظرة في الإعدادات'
+  ]},
   {v:'2.13.0', date:'2026-07', notes:[
     'زر 📋 دراسة في الشريط السفلي (بجوار جديدة وجمارك)',
     'تكاليف الشحنة داخل صفحة الدراسة: شحن وجمارك رسمية ومصاريف — كالإكسل',
@@ -3223,6 +3235,22 @@ async function authSignOut(){
   try{ if(fb&&fb.auth) await fb.authFns.signOut(fb.auth); }catch(e){}
   authUser=null;
 }
+async function ensureProfile(uid, username){
+  try{
+    const {fs}=fb;
+    /* هل يوجد مدير مسبقًا؟ */
+    let hasAdmin=false;
+    try{
+      const qs=await fs.getDocs(fs.collection(fb.db,'vaults/'+vaultCode()+'/users'));
+      qs.forEach(d=>{ const x=d.data(); if(x && x.role==='admin') hasAdmin=true; });
+    }catch(e){}
+    const role = hasAdmin ? 'staff' : 'admin';
+    const prof = {username:(username||'مستخدم').trim(), role, perms: role==='admin'?adminPerms():defaultStaffPerms(), createdAt:Date.now(), autoCreated:true};
+    await fs.setDoc(fs.doc(fb.db,'vaults/'+vaultCode()+'/users/'+uid), prof);
+    if(role==='admin') setTimeout(()=>toast('👑 دخلت كمدير — أُنشئ ملف صلاحياتك'),600);
+    return prof;
+  }catch(e){ console.error('ensureProfile', e); return null; }
+}
 async function loadAuthProfile(uid){
   try{
     const {fs}=fb;
@@ -3287,15 +3315,57 @@ function cloudCopy(coll, item){
 }
 function fbDocRef(coll, id){ return fb.fs.doc(fb.db, 'vaults/'+vaultCode()+'/'+coll+'/'+String(id)); }
 
+/* ===== طابور المزامنة المؤجلة: يضمن رفع تعديلات الأوفلاين عند عودة الاتصال ===== */
+let _dirty = {};          /* مجموعات تنتظر الرفع */
+let _flushTimer = null;
+let _flushing = false;
+function loadDirty(){ try{ _dirty = JSON.parse(store.get('griffin_dirty')||'{}'); }catch(e){ _dirty={}; } }
+function saveDirty(){ try{ store.set('griffin_dirty', JSON.stringify(_dirty)); }catch(e){} }
+function markDirty(coll){ _dirty[coll]=Date.now(); saveDirty(); updatePendingUI(); }
+function clearDirty(coll){ delete _dirty[coll]; saveDirty(); updatePendingUI(); }
+function pendingCount(){ return Object.keys(_dirty).length; }
+function updatePendingUI(){
+  const el=$('syncStatus'); if(!el) return;
+  if(!syncEnabled()){ el.textContent='المزامنة متوقفة'; return; }
+  const n=pendingCount();
+  el.textContent = n>0
+    ? '⏳ '+n+' تعديل بانتظار الرفع — سيُرفع تلقائيًا عند عودة الاتصال'
+    : '☁️ المزامنة مفعّلة — كل التعديلات مرفوعة';
+}
+/* محاولة تفريغ الطابور: عند عودة الشبكة، عند العودة للتطبيق، ودوريًا */
+async function flushDirty(reason){
+  if(_flushing || !syncEnabled()) return;
+  if(pendingCount()===0) return;
+  if(!navigator.onLine) return;
+  _flushing = true;
+  try{
+    if(!fbReady){ const ok=await initFirebase(); if(!ok){ _flushing=false; return; } }
+    if(authEnabled() && fb && fb.auth && !fb.auth.currentUser){ _flushing=false; return; }  /* ينتظر تسجيل الدخول */
+    const colls=Object.keys(_dirty);
+    for(const coll of colls){ await fbPushDelta(coll, true); }
+    if(pendingCount()===0 && reason==='online') toast('☁️ رُفعت التعديلات المؤجلة');
+  }catch(e){ console.error('flush', e); }
+  _flushing = false;
+}
+function startSyncWatchdog(){
+  window.addEventListener('online', ()=>{ toast('📶 عاد الاتصال — جارٍ رفع التعديلات'); flushDirty('online'); });
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) flushDirty('visible'); });
+  clearInterval(_flushTimer);
+  _flushTimer = setInterval(()=>flushDirty('timer'), 45000);   /* محاولة كل 45 ثانية */
+}
+
 /* رفع الدلتا: يقارن كل عنصر ببصمته السحابية ويرفع المتغيّر فقط، ويحذف سحابيًا ما أُزيل محليًا */
 function fbPushDebounced(coll, _unused){
   if(!syncEnabled()) return;
+  markDirty(coll);                       /* سجّل النية فورًا — لا تضيع إن انقطع الاتصال */
   clearTimeout(_pushTimers[coll]);
   _pushTimers[coll] = setTimeout(()=>{ fbPushDelta(coll); }, 800);
 }
-async function fbPushDelta(coll){
-  if(!syncEnabled() || !fbReady || fbSyncing) return;
+async function fbPushDelta(coll, fromFlush){
+  if(!syncEnabled()) return;
   if(!SYNC_COLLS.includes(coll) && coll!=='catalog'){ return; }
+  if(fbSyncing) return;                  /* أثناء تطبيق تحديث وارد */
+  if(!fbReady || !navigator.onLine){ markDirty(coll); return; }   /* أجّل ولا تفقد */
   try{
     if(coll==='catalog'){ await fbPushCatalog(); return; }
     const {fs}=fb;
@@ -3320,11 +3390,14 @@ async function fbPushDelta(coll){
       markTrash(coll, id);
     }
     saveSyncMeta();
-  }catch(e){ console.error('pushDelta '+coll, e); }
+    clearDirty(coll);                    /* رُفع بنجاح */
+  }catch(e){ console.error('pushDelta '+coll, e); markDirty(coll); }   /* فشل → أعد المحاولة لاحقًا */
 }
 /* الكتالوج: وثيقة لكل مورد */
 async function fbPushCatalog(){
-  if(!syncEnabled() || !fbReady || fbSyncing) return;
+  if(!syncEnabled()) return;
+  if(fbSyncing) return;
+  if(!fbReady || !navigator.onLine){ markDirty('catalog'); return; }
   try{
     const {fs}=fb;
     const hashes=_itemHash['catalog']=_itemHash['catalog']||{};
@@ -3346,7 +3419,8 @@ async function fbPushCatalog(){
       markTrash('catalog', id);
     }
     saveSyncMeta();
-  }catch(e){ console.error('pushCatalog', e); }
+    clearDirty('catalog');
+  }catch(e){ console.error('pushCatalog', e); markDirty('catalog'); }
 }
 
 let _lastPushHash = {};
@@ -3357,6 +3431,9 @@ async function fbStartListening(){
   if(!fbReady) return;
   fbStopListening();
   loadSyncMeta();
+  loadDirty();
+  startSyncWatchdog();
+  flushDirty('start');        /* ارفع أي تعديلات معلّقة من جلسة سابقة */
   const {fs}=fb;
   [...SYNC_COLLS,'catalog'].forEach(coll=>{
     const colRef = fs.collection(fb.db, 'vaults/'+vaultCode()+'/'+coll);
@@ -3589,7 +3666,10 @@ function askSyncDirection(){
 }
 function updateSyncUI(){
   const el=$('syncStatus');
-  if(el) el.textContent = syncEnabled() ? '☁️ المزامنة مفعّلة — لحظية بين الأجهزة' : 'المزامنة متوقفة';
+  if(el){
+    if(!syncEnabled()) el.textContent='المزامنة متوقفة';
+    else updatePendingUI();
+  }
   if($('set_cloudSync')) $('set_cloudSync').checked = syncEnabled();
   if($('showCodeBtn')) $('showCodeBtn').style.display = (syncEnabled() && vaultCode()) ? 'block' : 'none';
 }
@@ -3777,27 +3857,47 @@ function showSummary(){
 function showAuthGate(){
   const img=document.querySelector('.logo-card img');
   if(img && $('authLogo')) $('authLogo').src=img.src;
-  /* جهاز جديد بلا رمز سري: اطلبه مع بيانات الدخول (مرة واحدة) */
-  if($('authVault')) $('authVault').style.display = vaultCode() ? 'none' : 'block';
+  /* أظهر حقل الرمز إن لم يكن محفوظًا؛ ومع ذلك يمكن إظهاره يدويًا دائمًا */
+  const has=!!vaultCode();
+  if($('authVault')){
+    $('authVault').style.display = has ? 'none' : 'block';
+    if(has) $('authVault').value = vaultCode();
+  }
+  if($('authVaultToggle')) $('authVaultToggle').style.display = has ? 'block' : 'none';
   $('authGate').style.display='flex';
   setTimeout(()=>$('authUsername').focus(),200);
   $('authPassword').onkeydown=e=>{ if(e.key==='Enter') doAuthLogin(); };
+}
+function showVaultField(){
+  if($('authVault')){ $('authVault').style.display='block'; $('authVault').focus(); }
+  if($('authVaultToggle')) $('authVaultToggle').style.display='none';
 }
 function hideAuthGate(){ $('authGate').style.display='none'; }
 async function doAuthLogin(){
   const u=$('authUsername').value.trim(), p=$('authPassword').value;
   if(!u||!p){ $('authMsg').textContent='أدخل اسم المستخدم وكلمة المرور'; return; }
-  /* جهاز جديد: يجب رمز المزامنة السري أولًا (يعطيه المدير مرة واحدة) */
-  if(!vaultCode()){
-    const vc=($('authVault').value||'').trim();
-    if(vc.length<20){ $('authMsg').textContent='أدخل رمز المزامنة السري الصحيح (يرسله لك المدير)'; return; }
-    SETTINGS.vaultCode=vc; SETTINGS.cloudSync='1'; SETTINGS.authOn='1'; saveSettings();
+  /* الرمز السري: من الحقل إن كان ظاهرًا (جهاز جديد أو تصحيح رمز خاطئ) */
+  const vaultVisible = $('authVault') && $('authVault').style.display!=='none';
+  if(!vaultCode() || vaultVisible){
+    const vc=(($('authVault')&&$('authVault').value)||'').trim();
+    if(vc.length<20){ $('authMsg').textContent='أدخل رمز المزامنة السري الصحيح (يبدأ بـ griffin-)'; showVaultField(); return; }
+    if(vc!==vaultCode()){ SETTINGS.vaultCode=vc; }
+    SETTINGS.cloudSync='1'; SETTINGS.authOn='1'; saveSettings();
   }
   $('authMsg').textContent='⏳ جارٍ التحقق...';
   const res=await authSignIn(u,p);
-  if(!res.ok){ $('authMsg').textContent=res.msg; $('authPassword').value=''; return; }
+  if(!res.ok){
+    $('authMsg').textContent=res.msg+' — تأكد من اسم المستخدم وكلمة المرور';
+    $('authPassword').value='';
+    if($('authVaultToggle')) $('authVaultToggle').style.display='block';
+    return;
+  }
   /* حمّل ملف المستخدم (الدور والصلاحيات) */
-  const profile=await loadAuthProfile(authUser.uid);
+  let profile=await loadAuthProfile(authUser.uid);
+  if(!profile){
+    /* حساب بلا ملف صلاحيات (أُنشئ من لوحة Firebase): اجعله مديرًا إن لم يكن هناك مدير */
+    profile = await ensureProfile(authUser.uid, u);
+  }
   currentUser = {
     id: authUser.uid,
     name: profile?profile.username:u,
