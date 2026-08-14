@@ -926,7 +926,10 @@ section.open .sec-b{display:block}
   <div style="color:#B9C6DD;font-size:13px;font-weight:600">تسجيل الدخول الآمن</div>
   <input id="authVault" style="width:220px;padding:13px;border-radius:12px;border:0;font-size:13px;text-align:center;font-family:inherit;direction:ltr;display:none" placeholder="رمز المزامنة السري (من المدير)">
   <input id="authUsername" autocomplete="username" style="width:220px;padding:13px;border-radius:12px;border:0;font-size:16px;text-align:center;font-family:inherit" placeholder="اسم المستخدم">
-  <input id="authPassword" type="password" autocomplete="current-password" style="width:220px;padding:13px;border-radius:12px;border:0;font-size:16px;text-align:center;font-family:inherit" placeholder="كلمة المرور">
+  <div style="position:relative;display:inline-block">
+    <input id="authPassword" type="password" autocomplete="current-password" style="width:220px;padding:13px;border-radius:12px;border:0;font-size:16px;text-align:center;font-family:inherit" placeholder="كلمة المرور">
+    <span id="authPwToggle" onclick="toggleAuthPw()" title="إظهار/إخفاء كلمة المرور" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:18px;user-select:none;line-height:1">👁️</span>
+  </div>
   <button onclick="doAuthLogin()" style="background:#E8A33D;border:0;border-radius:12px;padding:12px 48px;font-family:'Changa','IBM Plex Sans Arabic',sans-serif;font-weight:800;font-size:16px;color:#1B2B4B;cursor:pointer">دخول</button>
   <div id="authMsg" style="color:#FF9B9B;font-size:13px;min-height:18px;text-align:center;max-width:260px"></div>
   <a id="authVaultToggle" onclick="showVaultField()" style="color:#B9C6DD;font-size:12.5px;text-decoration:underline;cursor:pointer;display:none">إدخال / تغيير رمز المزامنة السري</a>
@@ -2962,9 +2965,13 @@ function toast(msg){
 }
 
 /* ================= نسخة النظام وسجل التحديثات ================= */
-const APP_VERSION = '2.14.1';
+const APP_VERSION = '2.14.2';
 const AUTH_REQUIRED = true;   /* فرض بوابة الدخول على كل الأجهزة — مبني في النسخة */
 const CHANGELOG = [
+  {v:'2.14.2', date:'2026-08', notes:[
+    'الدخول يقبل البريد الحقيقي (مثل ...@gmail.com) كما هو — لا يُشترط اسم مختصر',
+    'زر 👁️ لإظهار/إخفاء كلمة المرور في شاشة الدخول'
+  ]},
   {v:'2.14.1', date:'2026-07', notes:[
     'إصلاح الدخول: يمكن دائمًا إدخال/تصحيح رمز المزامنة من شاشة الدخول',
     'حساب أُنشئ من لوحة Firebase يحصل على صلاحياته تلقائيًا (أول حساب = مدير)',
@@ -3177,7 +3184,11 @@ async function initFirebase(){
 /* ================= المصادقة عبر Firebase Auth (أمان قوي بخادم) =================
    اسم المستخدم يُحوّل داخليًا لبريد وهمي. البيانات لا تُقرأ إلا بعد تسجيل دخول ناجح. */
 const AUTH_DOMAIN_SUFFIX = '@griffin-calc.local';
-function userToEmail(username){ return String(username||'').trim().toLowerCase().replace(/\s+/g,'')+AUTH_DOMAIN_SUFFIX; }
+function userToEmail(username){
+  const u = String(username||'').trim().toLowerCase().replace(/\s+/g,'');
+  /* إن كتب المستخدم بريدًا حقيقيًا (يحتوي @) استُخدم كما هو؛ وإلا تُضاف اللاحقة الافتراضية */
+  return u.includes('@') ? u : u + AUTH_DOMAIN_SUFFIX;
+}
 let authUser = null;   /* مستخدم Firebase المسجّل حاليًا */
 function authEnabled(){ return SETTINGS.authOn==='1'; }
 
@@ -3873,6 +3884,12 @@ function showVaultField(){
   if($('authVaultToggle')) $('authVaultToggle').style.display='none';
 }
 function hideAuthGate(){ $('authGate').style.display='none'; }
+function toggleAuthPw(){
+  const inp=$('authPassword'), ic=$('authPwToggle');
+  if(!inp) return;
+  if(inp.type==='password'){ inp.type='text'; if(ic) ic.textContent='🙈'; }
+  else { inp.type='password'; if(ic) ic.textContent='👁️'; }
+}
 async function doAuthLogin(){
   const u=$('authUsername').value.trim(), p=$('authPassword').value;
   if(!u||!p){ $('authMsg').textContent='أدخل اسم المستخدم وكلمة المرور'; return; }
