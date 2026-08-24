@@ -688,6 +688,10 @@ section.open .sec-b{display:block}
         </div>
         <button class="addrow" onclick="rcFromShipment()" style="margin-top:10px">⬇️ جلب البيانات والأصناف من الحركة الحالية</button>
         <div class="ohead" style="grid-template-columns:24px 1fr 52px 76px 76px 24px"><span>#</span><span style="text-align:right">اسم الصنف</span><span>الكمية</span><span>الإنتاج</span><span>الانتهاء</span><span></span></div>
+        <div class="grid2" style="margin-bottom:10px">
+          <div class="f"><label>رقم البيان</label><input id="actNo" placeholder="تلقائي" oninput="actuals.no=this.value"></div>
+          <div class="f"><label>التاريخ</label><input id="actDate" type="date" onchange="actuals.date=this.value"></div>
+        </div>
         <div style="display:flex;gap:8px;margin-bottom:8px">
           <button class="addrow" style="margin-top:0;flex:1;border-color:var(--sea);background:#EAF4F9;color:var(--sea)" onclick="rcFromCatalog()">📚 جلب من الكتالوج</button>
           <button class="addrow" style="margin-top:0;flex:1" onclick="rcFromShipment()">📋 جلب من الدراسة</button>
@@ -719,7 +723,8 @@ section.open .sec-b{display:block}
     </section>
 
     <div class="pageActions">
-      <button class="pa-save" onclick="saveShipment();toast('✓ حُفظ البيان')">💾 حفظ البيان</button>
+      <button class="pa-save" onclick="saveCustoms()">💾 حفظ البيان</button>
+      <button class="pa-new" onclick="newCustoms()">＋ بيان جديد</button>
     </div>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
       <button class="addrow" style="margin-top:0;flex:1;min-width:80px" onclick="exportActuals('pdf')">📄 PDF</button>
@@ -1035,6 +1040,7 @@ const ACT_SUB_LABELS = [
 ];
 function freshActuals(){
   return {
+    no:'', date:new Date().toISOString().slice(0,10),
     main: ACT_MAIN_LABELS.map((l,i)=>({label:l, val:'', k:(i===0?'invoice':undefined)})),
     sub:  ACT_SUB_LABELS.map(l=>({label:l, val:''})),
     kak:'', cash:'',
@@ -1505,28 +1511,31 @@ function renderSavedTab(){
   }
 
   else if(savedTab==='actuals'){
-    /* الحركات التي فيها بيان فعلية أو بيان استلام */
-    let all=loadAll().filter(s=>s.actuals && (actualsHasData(s.actuals) || (s.actuals.receipt&&((s.actuals.receipt.items||[]).some(x=>x.name)||s.actuals.receipt.supplier))))
-                     .sort((a,b)=>(b.savedAt||'').localeCompare(a.savedAt||''));
-    if(q) all=all.filter(s=>((s.supplier||'')+' '+((s.actuals.receipt&&s.actuals.receipt.supplier)||'')).toLowerCase().includes(q));
+    let all = CUSTOMS.slice().sort((a,b)=>(b.savedAt||'').localeCompare(a.savedAt||''));
+    if(q) all=all.filter(c=>((c.supplier||'')+' '+(c.shipNo||'')+' '+(c.no||'')).toLowerCase().includes(q));
     count=all.length;
-    if(all.length===0){ html='<div class="empty">'+(q?'لا نتائج':'لا توجد بيانات فعلية محفوظة — أضف بيان الفعلية لحركة ثم احفظها')+'</div>'; }
+    if(all.length===0){ html='<div class="empty">'+(q?'لا نتائج':'لا توجد بيانات جمارك محفوظة — افتح «جمارك فعلية» واحفظ بيانًا')+'</div>'; }
     else{
-      const g=_grpBySupplier(all, s=>(s.actuals.receipt&&s.actuals.receipt.supplier)||s.supplier);
+      const g=_grpBySupplier(all, c=>c.supplier);
       Object.keys(g).sort().forEach(sup=>{
         html+=`<div class="grp-head">🏢 ${esc(sup)} <span>(${g[sup].length})</span></div>`;
-        g[sup].forEach(s=>{
-          const rc=s.actuals.receipt||{}; const d=s.savedAt?new Date(s.savedAt):null;
-          const dt=d?d.toLocaleDateString('ar'):'';
+        g[sup].forEach(c=>{
+          const t=(c.totals&&c.totals.mainT)||0;
+          const rem=(c.totals&&c.totals.remain)||0;
+          const rc=c.receipt||{};
           html+=`<div class="ship-card">
-            <div class="ship-main" onclick="openShipment(${s.id})">
-              <div><div class="t">${rc.shipNo?'استلام شحنة '+esc(rc.shipNo):(s.shipNo?'شحنة '+esc(s.shipNo):'بيان فعلي')}</div>
-              <div class="s">${rc.containers?rc.containers+' حاوية · ':''}${rc.totalCartons?fmt(num(rc.totalCartons))+' كرتون · ':''}${(rc.items||[]).filter(x=>x.name).length} صنف<br>🕐 ${dt}</div></div>
+            <div class="ship-main" onclick="openCustoms(${c.id})">
+              <div><div class="t">بيان رقم ${esc(c.no||'—')} ${c.shipNo?'· شحنة '+esc(c.shipNo):''}</div>
+              <div class="s">${rc.containers?esc(rc.containers)+' حاوية · ':''}${rc.totalCartons?fmt(num(rc.totalCartons))+' كرتون · ':''}${(rc.items||[]).filter(x=>x.name).length} صنف<br>📅 ${c.date||''}</div></div>
+              <div style="text-align:left">
+                <div class="amt num">${fmt(Math.round(t))}</div>
+                <div style="font-size:10.5px;color:${Math.abs(rem)<1?'#128C4A':'#C0392B'}">${Math.abs(rem)<1?'مسدّد':'متبقٍ '+fmt(Math.round(rem))}</div>
+              </div>
             </div>
             <div class="ship-acts">
-              <button onclick="openActuals(${s.id})">✏️ تعديل</button>
-              <button onclick="exportById(${s.id},'pdf')">📄 PDF</button>
-              ${showDel?`<button class="d" onclick="event.stopPropagation();delShipment(${s.id})">🗑 حذف</button>`:''}
+              <button onclick="openCustoms(${c.id})">✏️ تعديل</button>
+              <button onclick="event.stopPropagation();exportCustomsById(${c.id},'pdf')">📄 PDF</button>
+              <button class="d" onclick="event.stopPropagation();delCustoms(${c.id})">🗑 حذف</button>
             </div></div>`;
         });
       });
@@ -1839,7 +1848,12 @@ function exportById(id, kind){
 }
 
 /* ================= صفحة التكاليف الفعلية ================= */
-function openActPage(){ renderActuals(); $('actPage').classList.add('open'); document.body.style.overflow='hidden'; }
+function openActPage(){
+  if(!actuals.no) actuals.no = nextCustomsNo();
+  if(!actuals.date) actuals.date = new Date().toISOString().slice(0,10);
+  if($('actNo')) $('actNo').value = actuals.no;
+  if($('actDate')) $('actDate').value = actuals.date;
+  renderActuals(); $('actPage').classList.add('open'); document.body.style.overflow='hidden'; }
 function closeActPage(){ $('actPage').classList.remove('open'); document.body.style.overflow=''; }
 
 function actRow(list, i, item){
@@ -2000,19 +2014,27 @@ function addAct(list){ actuals[list].push({label:'',val:'',custom:true}); render
 function rmAct(list,i){ actuals[list].splice(i,1); renderActuals(); }
 
 /* ===== تصدير بيان الجمارك والخرجيات الفعلية: PDF / إكسل / مشاركة ===== */
+function exportCustomsById(id, kind){
+  const c=CUSTOMS.find(x=>x.id===id); if(!c) return;
+  const bak=JSON.parse(JSON.stringify(actuals));
+  actuals={no:c.no,date:c.date,main:c.main,sub:c.sub,kak:c.kak,cash:c.cash,receipt:c.receipt};
+  exportActuals(kind);
+  actuals=bak;
+}
 function exportActuals(kind){
   if(!can('export')){ toast('لا تملك صلاحية التصدير'); return; }
   const {subT, mainT, remain} = actualsTotals();
   const S=SETTINGS;
-  const sup = $('supplier').value || (actuals.receipt&&actuals.receipt.supplier) || '';
-  const shipNo = $('shipNo').value || (actuals.receipt&&actuals.receipt.shipNo) || '';
-  const dateStr = new Date().toLocaleDateString('ar');
+  const sup = (actuals.receipt&&actuals.receipt.supplier) || $('supplier').value || '';
+  const shipNo = (actuals.receipt&&actuals.receipt.shipNo) || $('shipNo').value || '';
+  const dateStr = actuals.date ? new Date(actuals.date).toLocaleDateString('ar') : new Date().toLocaleDateString('ar');
+  const docNo = actuals.no||'';
   const mainItems = actuals.main.filter(x=>(x.label&&x.label.trim())||num(x.val)>0);
   const subItems = actuals.sub.filter(x=>(x.label&&x.label.trim())&&num(x.val)>0);
 
   if(kind==='xlsx'){
     const aoa=[['بيان مصروفات وجمارك فعلية — Griffin Africa'],
-      ['المورد:',sup,'الشحنة:',shipNo,'التاريخ:',dateStr],[],
+      ['رقم البيان:',docNo,'المورد:',sup,'الشحنة:',shipNo,'التاريخ:',dateStr],[],
       ['#','البند','المبلغ DJF']];
     mainItems.forEach((x,i)=>aoa.push([i+1,x.label,num(x.val)]));
     aoa.push(['','تسهيلات ومصاريف أخرى (من القائمة الفرعية)',subT]);
@@ -2030,7 +2052,7 @@ function exportActuals(kind){
     ws['!cols']=[{wch:4},{wch:52},{wch:14}];
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,ws,'جمارك فعلية');
-    XLSX.writeFile(wb,`جمارك_فعلية_${(sup||'شحنة').replace(/\s/g,'_')}.xlsx`);
+    XLSX.writeFile(wb,`جمارك_${docNo||''}_${(sup||'شحنة').replace(/\s/g,'_')}.xlsx`);
     toast('📊 تم تصدير الإكسل');
     logAudit('تصدير جمارك إكسل', sup);
     return;
@@ -2042,7 +2064,7 @@ function exportActuals(kind){
   const tpl=`<div id="actRpt" style="font-family:Arial,'IBM Plex Sans Arabic';padding:14px;background:#fff;direction:rtl;width:720px;max-width:720px;box-sizing:border-box">
     <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #1B2B4B;padding-bottom:8px;margin-bottom:10px">
       <div><div style="font-size:18px;font-weight:800;color:#1B2B4B">بيان مصروفات وجمارك فعلية</div>
-      <div style="font-size:11.5px;color:#555;margin-top:3px">المورد: <b>${esc(sup)||'—'}</b> · الشحنة: <b>${esc(shipNo)||'—'}</b> · التاريخ: ${dateStr}</div></div>
+      <div style="font-size:11.5px;color:#555;margin-top:3px">رقم البيان: <b>${esc(docNo)||'—'}</b> · المورد: <b>${esc(sup)||'—'}</b> · الشحنة: <b>${esc(shipNo)||'—'}</b> · التاريخ: ${dateStr}</div></div>
       <img src="${document.querySelector('.logo-card img').src}" style="height:46px">
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:11.5px;text-align:center">
@@ -2504,6 +2526,79 @@ function confirmPick(){
 
 /* ================= أوردرات الشراء (بنفس نموذج Griffin Africa الرسمي) ================= */
 let ORDERS = [];
+let CUSTOMS = [];    /* بيانات الجمارك والخرجيات الفعلية — سجلات مستقلة */
+let currentCustomsId = null;
+function loadCustomsPlain(){
+  try{ CUSTOMS = JSON.parse(store.get('griffin_customs')||'[]'); }catch(e){ CUSTOMS=[]; }
+  if(!Array.isArray(CUSTOMS)) CUSTOMS=[];
+}
+function persistCustoms(){
+  try{ store.set('griffin_customs', JSON.stringify(CUSTOMS)); }catch(e){ toast('⚠️ تعذر حفظ بيانات الجمارك'); }
+  if(typeof fbPushDebounced==='function') fbPushDebounced('customs', CUSTOMS);
+}
+function nextCustomsNo(){
+  let mx=0; CUSTOMS.forEach(c=>{ const n=parseInt(c.no); if(isFinite(n)&&n>mx) mx=n; });
+  return String(mx+1);
+}
+/* حفظ بيان الجمارك كسجل مستقل */
+function saveCustoms(){
+  const {subT, mainT, remain} = actualsTotals();
+  const rec = {
+    id: currentCustomsId || Date.now(),
+    no: (actuals.no || nextCustomsNo()),
+    supplier: (actuals.receipt&&actuals.receipt.supplier) || $('supplier').value || '',
+    shipNo: (actuals.receipt&&actuals.receipt.shipNo) || $('shipNo').value || '',
+    date: actuals.date || new Date().toISOString().slice(0,10),
+    main: JSON.parse(JSON.stringify(actuals.main||[])),
+    sub:  JSON.parse(JSON.stringify(actuals.sub||[])),
+    kak: actuals.kak||'', cash: actuals.cash||'',
+    receipt: JSON.parse(JSON.stringify(actuals.receipt||{})),
+    totals: {subT, mainT, remain},
+    savedAt: new Date().toISOString()
+  };
+  actuals.no = rec.no; actuals.date = rec.date;
+  const i = CUSTOMS.findIndex(x=>x.id===rec.id);
+  if(i>=0) CUSTOMS[i]=rec; else CUSTOMS.push(rec);
+  currentCustomsId = rec.id;
+  persistCustoms();
+  if($('actNo')) $('actNo').value = rec.no;
+  logAudit('حفظ بيان جمارك', rec.supplier||rec.no);
+  toast('✓ حُفظ بيان الجمارك رقم '+rec.no);
+}
+function openCustoms(id){
+  const c = CUSTOMS.find(x=>x.id===id); if(!c) return;
+  currentCustomsId = c.id;
+  actuals = {
+    no: c.no||'', date: c.date||'',
+    main: JSON.parse(JSON.stringify(c.main||[])),
+    sub:  JSON.parse(JSON.stringify(c.sub||[])),
+    kak: c.kak||'', cash: c.cash||'',
+    receipt: JSON.parse(JSON.stringify(c.receipt||{supplier:'',shipNo:'',containers:'',totalCartons:'',items:[]}))
+  };
+  closeSavedPage();
+  setTimeout(()=>{ openActPage(); }, 200);
+}
+function delCustoms(id){
+  const c = CUSTOMS.find(x=>x.id===id);
+  const nm = c ? (c.supplier||('بيان رقم '+c.no)) : 'البيان';
+  if(!confirm('حذف "'+nm+'" نهائيًا؟\n\n⚠️ سيُحذف من كل الأجهزة المتزامنة ولا يمكن التراجع.')) return;
+  CUSTOMS = CUSTOMS.filter(x=>x.id!==id);
+  if(currentCustomsId===id) currentCustomsId=null;
+  persistCustoms(); renderSavedTab();
+  logAudit('حذف بيان جمارك', nm);
+  toast('✓ حُذف البيان');
+}
+function newCustoms(){
+  if(!confirm('بدء بيان جمارك جديد؟ البيانات غير المحفوظة ستُفقد.')) return;
+  currentCustomsId=null;
+  actuals = freshActuals();
+  actuals.no = nextCustomsNo();
+  actuals.date = new Date().toISOString().slice(0,10);
+  renderActuals(); fillReceipt(); calcActuals();
+  if($('actNo')) $('actNo').value = actuals.no;
+  toast('✓ بيان جديد رقم '+actuals.no);
+}
+
 let PAYMENTS = [];   /* دفتر ذمم الموردين: فواتير ودفعات */
 function loadPaymentsPlain(){
   try{ PAYMENTS = JSON.parse(store.get('griffin_payments')||'[]'); }catch(e){ PAYMENTS=[]; }
@@ -3097,9 +3192,16 @@ function toast(msg){
 }
 
 /* ================= نسخة النظام وسجل التحديثات ================= */
-const APP_VERSION = '3.0.4';
+const APP_VERSION = '3.1.0';
 const AUTH_REQUIRED = true;   /* فرض بوابة الدخول على كل الأجهزة — مبني في النسخة */
 const CHANGELOG = [
+  {v:'3.1.0', date:'2026-07', notes:[
+    '🔀 فصل كامل: بيان الجمارك سجل مستقل عن الدراسة',
+    'حفظ وحذف الجمارك لا يؤثران على الدراسات إطلاقًا',
+    'ترقيم تلقائي متسلسل لبيانات الجمارك + حقل تاريخ',
+    'زر ＋ بيان جديد داخل صفحة الجمارك',
+    'رقم البيان يظهر في PDF والإكسل واسم الملف'
+  ]},
   {v:'3.0.4', date:'2026-07', notes:[
     'إصلاح: بيان الجمارك يُصدَّر طوليًا (A4 portrait) بدل العرضي',
     'ضبط عرض التقرير ليناسب الورقة والصورة'
@@ -3438,7 +3540,7 @@ let _pushTimers = {};
 let _itemHash = {};      /* بصمة آخر نسخة سحابية معروفة لكل عنصر: coll -> {id:hash} */
 let _trash = {};         /* شواهد الحذف: coll -> {id:deletedAtMs} */
 let _syncReady = {};     /* هل اكتمل التحميل الأولي لكل مجموعة */
-const SYNC_COLLS = ['shipments','orders','payments'];
+const SYNC_COLLS = ['shipments','orders','payments','customs'];
 
 function loadSyncMeta(){
   try{ _itemHash = JSON.parse(store.get('griffin_synchash')||'{}'); }catch(e){ _itemHash={}; }
@@ -3458,22 +3560,25 @@ function markTrash(coll, id){
 function inTrash(coll, id){ return !!(_trash[coll]&&_trash[coll][id]); }
 
 function collData(coll){
-  return coll==='shipments'? DB : coll==='orders'? ORDERS : coll==='payments'? PAYMENTS : [];
+  return coll==='shipments'? DB : coll==='orders'? ORDERS : coll==='payments'? PAYMENTS : coll==='customs'? CUSTOMS : [];
 }
 function setCollData(coll, arr){
   if(coll==='shipments') DB=arr;
   else if(coll==='orders') ORDERS=arr;
   else if(coll==='payments') PAYMENTS=arr;
+  else if(coll==='customs') CUSTOMS=arr;
 }
 function persistColl(coll){
   if(coll==='shipments') store.set('griffin_shipments', JSON.stringify(DB));
   else if(coll==='orders') store.set('griffin_orders', JSON.stringify(ORDERS));
   else if(coll==='payments') store.set('griffin_payments', JSON.stringify(PAYMENTS));
+  else if(coll==='customs') store.set('griffin_customs', JSON.stringify(CUSTOMS));
 }
 function rerenderColl(coll){
   if(coll==='shipments'){ renderSaved(); }
   else if(coll==='orders'){ if($('savedPage')&&$('savedPage').classList.contains('open')) renderSavedTab(); }
   else if(coll==='payments'){ if($('payPage')&&$('payPage').classList.contains('open')) renderPayments(); }
+  else if(coll==='customs'){ if($('savedPage')&&$('savedPage').classList.contains('open')) renderSavedTab(); }
 }
 /* نسخة سحابية من العنصر: بلا مرفقات ثقيلة */
 function cloudCopy(coll, item){
@@ -3935,7 +4040,7 @@ function initDB(){
   /* البوابة إجبارية بالنسخة (AUTH_REQUIRED) أو مفعّلة بالإعدادات */
   if(AUTH_REQUIRED || (authEnabled() && vaultCode())){
     /* حمّل القشرة فقط، والبيانات بعد المصادقة */
-    DB=[]; loadOrdersPlain(); loadCatalogPlain(); loadPaymentsPlain(); loadSyncMeta();
+    DB=[]; loadOrdersPlain(); loadCatalogPlain(); loadPaymentsPlain(); loadCustomsPlain(); loadSyncMeta();
     initFirebase().then(()=>{
       /* راقب حالة المصادقة: إن كانت هناك جلسة سابقة، ادخل تلقائيًا */
       const {authFns, auth}=fb;
@@ -3967,11 +4072,11 @@ function initDB(){
     showLoginScreen();
     return;
   }
-  if(!raw){ DB=[]; loadOrdersPlain(); loadCatalogPlain(); loadPaymentsPlain(); loadSyncMeta(); afterLoad(); return; }
+  if(!raw){ DB=[]; loadOrdersPlain(); loadCatalogPlain(); loadPaymentsPlain(); loadCustomsPlain(); loadSyncMeta(); afterLoad(); return; }
   let parsed=null; try{ parsed=JSON.parse(raw); }catch(e){}
   if(parsed && parsed.enc){ showLoginScreen(); return; }
   DB = Array.isArray(parsed) ? parsed : [];
-  loadOrdersPlain(); loadCatalogPlain(); loadPaymentsPlain(); loadSyncMeta(); afterLoad();
+  loadOrdersPlain(); loadCatalogPlain(); loadPaymentsPlain(); loadCustomsPlain(); loadSyncMeta(); afterLoad();
 }
 function afterLoad(){
   renderSaved();
@@ -4242,7 +4347,7 @@ async function tryUnlock(){
     await unlockOrders(secKey); await unlockCatalog(secKey);
   } else {
     DB = pack && Array.isArray(pack) ? pack : [];
-    loadOrdersPlain(); loadCatalogPlain(); loadPaymentsPlain(); loadSyncMeta();
+    loadOrdersPlain(); loadCatalogPlain(); loadPaymentsPlain(); loadCustomsPlain(); loadSyncMeta();
   }
   $('lockPage').style.display='none'; $('lockPin').value=''; $('lockMsg').textContent='';
   afterLoad();
@@ -5061,7 +5166,7 @@ function showAlerts(){
 /* ================= النسخ الاحتياطي والاسترجاع ================= */
 function buildBackupData(){
   return { app:'griffin-import-calc', version:4, exportedAt:new Date().toISOString(),
-    shipments: loadAll(), orders: ORDERS, catalog: CATALOG, payments: PAYMENTS, settings: SETTINGS };
+    shipments: loadAll(), orders: ORDERS, catalog: CATALOG, payments: PAYMENTS, customs: CUSTOMS, settings: SETTINGS };
 }
 function backupData(){
   const blob = new Blob([JSON.stringify(buildBackupData(),null,1)], {type:'application/json'});
@@ -5124,6 +5229,11 @@ function restoreData(file){
         const oids = new Set(ORDERS.map(x=>x.id));
         ORDERS = ORDERS.concat(d.orders.filter(x=>!oids.has(x.id)));
         persistOrders();
+      }
+      if(Array.isArray(d.customs)){
+        const cids = new Set(CUSTOMS.map(x=>x.id));
+        CUSTOMS = CUSTOMS.concat(d.customs.filter(x=>!cids.has(x.id)));
+        persistCustoms();
       }
       if(Array.isArray(d.payments)){
         const pids = new Set(PAYMENTS.map(x=>x.id));
