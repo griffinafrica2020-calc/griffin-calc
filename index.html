@@ -2039,7 +2039,7 @@ function exportActuals(kind){
   /* قالب البيان (PDF وصورة) بنموذج جريفين */
   const rows = mainItems.map((x,i)=>`<tr><td>${i+1}</td><td style="text-align:right">${esc(x.label)}</td><td class="n">${fmt(num(x.val))}</td></tr>`).join('');
   const subRows = subItems.length? subItems.map((x,i)=>`<tr><td>${i+1}</td><td style="text-align:right">${esc(x.label)}</td><td class="n">${fmt(num(x.val))}</td></tr>`).join('') : '';
-  const tpl=`<div id="actRpt" style="font-family:Arial,'IBM Plex Sans Arabic';padding:12px;background:#fff;direction:rtl;width:780px">
+  const tpl=`<div id="actRpt" style="font-family:Arial,'IBM Plex Sans Arabic';padding:14px;background:#fff;direction:rtl;width:720px;max-width:720px;box-sizing:border-box">
     <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #1B2B4B;padding-bottom:8px;margin-bottom:10px">
       <div><div style="font-size:18px;font-weight:800;color:#1B2B4B">بيان مصروفات وجمارك فعلية</div>
       <div style="font-size:11.5px;color:#555;margin-top:3px">المورد: <b>${esc(sup)||'—'}</b> · الشحنة: <b>${esc(shipNo)||'—'}</b> · التاريخ: ${dateStr}</div></div>
@@ -2068,7 +2068,7 @@ function exportActuals(kind){
 
   if(kind==='pdf'){
     const w=window.open('','_blank');
-    w.document.write(`<html dir="rtl"><head><meta charset="utf-8"><style>@page{size:A4;margin:10mm}body{margin:0}td{border:1px solid #8CA0BF;padding:4px}.n{font-weight:600} *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}</style></head><body>${tpl}<script>setTimeout(()=>{window.print()},400)<\/script></body></html>`);
+    w.document.write(`<html dir="rtl"><head><meta charset="utf-8"><style>@page{size:A4 portrait;margin:10mm}body{margin:0}#actRpt{width:100%!important;max-width:190mm}td{border:1px solid #8CA0BF;padding:4px}.n{font-weight:600} *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}</style></head><body>${tpl}<script>setTimeout(()=>{window.print()},400)<\/script></body></html>`);
     w.document.close();
     toast('📄 جارٍ تجهيز PDF');
     logAudit('تصدير جمارك PDF', sup);
@@ -3097,9 +3097,13 @@ function toast(msg){
 }
 
 /* ================= نسخة النظام وسجل التحديثات ================= */
-const APP_VERSION = '3.0.3';
+const APP_VERSION = '3.0.4';
 const AUTH_REQUIRED = true;   /* فرض بوابة الدخول على كل الأجهزة — مبني في النسخة */
 const CHANGELOG = [
+  {v:'3.0.4', date:'2026-07', notes:[
+    'إصلاح: بيان الجمارك يُصدَّر طوليًا (A4 portrait) بدل العرضي',
+    'ضبط عرض التقرير ليناسب الورقة والصورة'
+  ]},
   {v:'3.0.3', date:'2026-07', notes:[
     'زر 🗑 حذف الحركة ظاهر دائمًا في المحفوظات',
     'رسالة تأكيد أوضح تذكر اسم الحركة وأثر الحذف على الأجهزة المتزامنة'
@@ -4914,7 +4918,7 @@ function supplierStatement(sup){
     <div style="margin-top:10px;font-size:10.5px;color:#555">Griffin Africa Company · Djibouti</div>
   </div>`;
   const w=window.open('','_blank');
-  w.document.write(`<html dir="rtl"><head><meta charset="utf-8"><style>@page{size:A4;margin:10mm}body{margin:0}td{border:1px solid #8CA0BF;padding:4px}.n{font-weight:600} *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}</style></head><body>${tpl}<script>setTimeout(()=>{window.print()},400)<\/script></body></html>`);
+  w.document.write(`<html dir="rtl"><head><meta charset="utf-8"><style>@page{size:A4 portrait;margin:10mm}body{margin:0}#actRpt{width:100%!important;max-width:190mm}td{border:1px solid #8CA0BF;padding:4px}.n{font-weight:600} *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}</style></head><body>${tpl}<script>setTimeout(()=>{window.print()},400)<\/script></body></html>`);
   w.document.close();
   logAudit('كشف حساب مورد', sup);
 }
