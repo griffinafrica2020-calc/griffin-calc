@@ -357,7 +357,7 @@ section.open .sec-b{display:block}
     <div class="hbtns">
       <button class="hbtn" onclick="openSettings()">⚙️</button>
       <button class="hbtn" onclick="pinSettings()">🔒</button>
-      <button class="hbtn" onclick="openSavedPage()">📁 المحفوظات</button>
+      <button class="hbtn" onclick="openCatPage()">📚 الكتالوج</button>
     </div>
   </div>
 </header>
@@ -673,7 +673,6 @@ section.open .sec-b{display:block}
   <div class="page-h">
     <button class="back" onclick="closeActPage()">→ رجوع</button>
     <h2>📑 جمارك وخرجيات فعلية</h2>
-    <button class="back" style="margin-inline-start:auto;background:#E8A33D;color:#1B2B4B;font-weight:800" onclick="saveShipment();toast('✓ حُفظ البيان')">💾 حفظ</button>
   </div>
   <div class="page-b">
     <div class="hint" style="margin-bottom:10px">سجّل هنا كل ما دُفع فعليًا من وصول البضاعة إلى ميناء جيبوتي حتى وصولها إلى المخازن (بالفرنك DJF). البنود مطابقة لبيان مصروفات وجمارك جريفين أفريكا، ويُحفظ البيان مع الحركة عند الضغط على "حفظ الحركة".</div>
@@ -1469,10 +1468,10 @@ function renderSavedTab(){
               <div class="amt num profit-only">${fmt(R.landedTotal)} DJF</div>
             </div>
             <div class="ship-acts">
+              <button onclick="openShipment(${s.id})">✏️ تعديل</button>
               <button onclick="exportById(${s.id},'pdf')">📄 PDF</button>
               <button onclick="exportById(${s.id},'xlsx')">📊 إكسل</button>
-              <button onclick="exportById(${s.id},'img')">🖼️ صورة</button>
-              ${showDel?`<button class="d" onclick="delShipment(${s.id})">🗑</button>`:''}
+              ${showDel?`<button class="d" onclick="event.stopPropagation();delShipment(${s.id})">🗑 حذف</button>`:''}
             </div></div>`;
         });
       });
@@ -1525,8 +1524,9 @@ function renderSavedTab(){
               <div class="s">${rc.containers?rc.containers+' حاوية · ':''}${rc.totalCartons?fmt(num(rc.totalCartons))+' كرتون · ':''}${(rc.items||[]).filter(x=>x.name).length} صنف<br>🕐 ${dt}</div></div>
             </div>
             <div class="ship-acts">
-              <button onclick="openShipment(${s.id})">✏️ فتح</button>
+              <button onclick="openActuals(${s.id})">✏️ تعديل</button>
               <button onclick="exportById(${s.id},'pdf')">📄 PDF</button>
+              ${showDel?`<button class="d" onclick="event.stopPropagation();delShipment(${s.id})">🗑 حذف</button>`:''}
             </div></div>`;
         });
       });
@@ -3096,9 +3096,18 @@ function toast(msg){
 }
 
 /* ================= نسخة النظام وسجل التحديثات ================= */
-const APP_VERSION = '3.0.0';
+const APP_VERSION = '3.0.2';
 const AUTH_REQUIRED = true;   /* فرض بوابة الدخول على كل الأجهزة — مبني في النسخة */
 const CHANGELOG = [
+  {v:'3.0.2', date:'2026-07', notes:[
+    'إزالة زر الحفظ المكرر من رأس صفحة الجمارك',
+    'أزرار ✏️ تعديل و🗑 حذف في بطاقات المحفوظات (دراسات وجمارك)',
+    'تعديل بيان الجمارك يفتح صفحته مباشرة'
+  ]},
+  {v:'3.0.1', date:'2026-07', notes:[
+    'إصلاح تكرار زر المحفوظات (أعلى وأسفل)',
+    'زر 📚 الكتالوج في الأعلى بدلًا منه'
+  ]},
   {v:'3.0.0', date:'2026-07', notes:[
     '🎯 إعادة هيكلة كاملة: واجهة أبسط وأثبت',
     'شريط سفلي من ٤ أزرار: دراسة أصناف · طريقة 1 · جمارك فعلية · المحفوظات',
@@ -4514,6 +4523,11 @@ function studyFromCatalog(){
   openCatalogPicker();
 }
 let _pickTarget='order';
+function openActuals(id){
+  openShipment(id);
+  closeSavedPage();
+  setTimeout(()=>openActPage(), 250);
+}
 function scrollToMain(){
   ['studyPage','actPage','savedPage','catPage','ordPage','payPage','rcPickPage','pickPage'].forEach(id=>{
     const el=$(id); if(el) el.classList.remove('open');

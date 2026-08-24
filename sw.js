@@ -1,5 +1,5 @@
 /* Griffin Africa Import Costing — Service Worker v20 */
-const CACHE = 'griffin-import-v38';
+const CACHE = 'griffin-import-v41';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './version.json'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
