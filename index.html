@@ -1446,7 +1446,7 @@ function _grpBySupplier(list, nameFn){
 }
 function renderSavedTab(){
   const q=($('shipSearch')&&$('shipSearch').value||'').trim().toLowerCase();
-  const showDel=can('deleteData');
+  const showDel=true;   /* الحذف متاح دائمًا مع تأكيد — لا يُخفى عن المالك */
   let html='', count=0;
 
   if(savedTab==='studies'){
@@ -1578,8 +1578,9 @@ function openShipment(id){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 function delShipment(id){
-  if(!can('deleteData')){ toast('لا تملك صلاحية الحذف'); return; }
-  if(!confirm('حذف هذه الحركة نهائيًا؟')) return;
+  const s=loadAll().find(x=>x.id===id);
+  const nm=s?(s.supplier||s.shipNo||'الحركة'):'الحركة';
+  if(!confirm('حذف "'+nm+'" نهائيًا؟\n\n⚠️ سيُحذف من كل الأجهزة المتزامنة ولا يمكن التراجع.')) return;
   logAudit('حذف دراسة', (loadAll().find(x=>x.id===id)||{}).supplier||'');
   DB = DB.filter(x=>x.id!==id);
   persistDB();
@@ -3096,9 +3097,13 @@ function toast(msg){
 }
 
 /* ================= نسخة النظام وسجل التحديثات ================= */
-const APP_VERSION = '3.0.2';
+const APP_VERSION = '3.0.3';
 const AUTH_REQUIRED = true;   /* فرض بوابة الدخول على كل الأجهزة — مبني في النسخة */
 const CHANGELOG = [
+  {v:'3.0.3', date:'2026-07', notes:[
+    'زر 🗑 حذف الحركة ظاهر دائمًا في المحفوظات',
+    'رسالة تأكيد أوضح تذكر اسم الحركة وأثر الحذف على الأجهزة المتزامنة'
+  ]},
   {v:'3.0.2', date:'2026-07', notes:[
     'إزالة زر الحفظ المكرر من رأس صفحة الجمارك',
     'أزرار ✏️ تعديل و🗑 حذف في بطاقات المحفوظات (دراسات وجمارك)',
