@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=5.0, user-scalable=yes">
 <meta name="theme-color" content="#1B2B4B">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
@@ -36,6 +36,22 @@ body{font-family:'IBM Plex Sans Arabic',Tahoma,sans-serif;background:var(--paper
 h1,h2,h3{font-family:'Changa','IBM Plex Sans Arabic',sans-serif}
 .num{font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:embed}
 .hidden{display:none!important}
+.pageActions{display:flex;gap:8px;margin:16px 0 8px;flex-wrap:wrap}
+.pageActions button{flex:1;min-width:110px;padding:13px 10px;border-radius:12px;border:1.5px solid var(--line);font-family:'Changa','IBM Plex Sans Arabic',sans-serif;font-weight:800;font-size:14px;cursor:pointer;background:var(--card);color:var(--ink)}
+.pageActions .pa-save{background:#1B2B4B;color:#fff;border-color:#1B2B4B}
+.pageActions .pa-exp{background:#FDF6E8;color:#A56A10;border-color:var(--amber)}
+.pageActions .pa-new{background:#EAF4F9;color:var(--sea);border-color:var(--sea)}
+/* شاشات كبيرة: عرض مريح وثابت */
+@media(min-width:820px){
+  .wrap,.page-b{max-width:900px;margin-inline:auto}
+  .bbar{max-width:900px;margin-inline:auto;border-radius:16px 16px 0 0}
+  .grid2{grid-template-columns:1fr 1fr 1fr}
+  .study-scroll{overflow-x:auto}
+  .pick-grid{grid-template-columns:repeat(4,1fr)}
+}
+@media(min-width:1200px){
+  .wrap,.page-b,.bbar{max-width:1100px}
+}
 .sti{padding:5px 6px;border:1.5px solid var(--line);border-radius:7px;font-family:inherit;font-size:11.5px;background:#FBFCFE;text-align:center}
 .sti:focus{border-color:var(--sea);outline:none}
 td.nm .sti{text-align:right}
@@ -250,11 +266,11 @@ section.open .sec-b{display:block}
 .bbar button{font-size:11.5px;padding:11px 2px}
 
 /* صفوف التكاليف الفعلية */
-.arow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px dashed var(--line)}
-.arow .lbl{flex:1;font-size:12.5px;color:var(--txt);line-height:1.5}
-.arow input.amt{width:110px;padding:8px;border:1.5px solid var(--line);border-radius:9px;font-family:inherit;font-size:14px;text-align:left;direction:ltr;background:#FBFCFE}
+.arow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line)}
+.arow .lbl{flex:1 1 auto;min-width:0;font-size:13px;color:var(--txt);line-height:1.55;word-break:break-word}
+.arow input.amt{flex:0 0 104px;width:104px;padding:9px 8px;border:1.5px solid var(--line);border-radius:9px;font-family:'Changa','IBM Plex Sans Arabic';font-weight:700;font-size:15px;text-align:center;direction:ltr;background:#FBFCFE}
 .arow input.amt:focus{outline:none;border-color:var(--sea);background:#fff}
-.arow input.lblin{flex:1;padding:8px;border:1.5px solid var(--line);border-radius:9px;font-family:inherit;font-size:12.5px;background:#FBFCFE}
+.arow input.lblin{flex:1 1 auto;min-width:0;padding:9px;border:1.5px solid var(--line);border-radius:9px;font-family:inherit;font-size:13px;line-height:1.5;background:#FBFCFE;text-align:right}
 .arow .rm{border:0;background:transparent;color:var(--loss);font-size:15px;cursor:pointer;padding:2px 4px}
 .arow.auto{background:#F7F9FC;margin:0 -16px;padding:9px 16px}
 .arow.auto .lbl{font-weight:700;color:var(--ink)}
@@ -342,7 +358,6 @@ section.open .sec-b{display:block}
       <button class="hbtn" onclick="openSettings()">⚙️</button>
       <button class="hbtn" onclick="pinSettings()">🔒</button>
       <button class="hbtn" onclick="openSavedPage()">📁 المحفوظات</button>
-      <button class="hbtn" onclick="openPayPage()">💳 الذمم</button>
     </div>
   </div>
 </header>
@@ -370,8 +385,8 @@ section.open .sec-b{display:block}
   </div>
 </div>
 
-<!-- Shipment info -->
-<section class="open">
+<!-- Shipment info (مخفي مؤقتًا — الحقول تعمل في الخلفية) -->
+<section class="open" id="shipInfoSec" style="display:none">
   <div class="sec-h" onclick="toggleSec(this)"><h2>📋 بيانات الشحنة</h2><span class="chev">▼</span></div>
   <div class="sec-b">
     <div class="grid2">
@@ -646,7 +661,6 @@ section.open .sec-b{display:block}
     </div>
     <div class="seg" style="margin-bottom:10px">
       <button id="savTabStudies" class="on" onclick="setSavedTab('studies')">📊 دراسات</button>
-      <button id="savTabOrders" onclick="setSavedTab('orders')">🧾 أوردرات</button>
       <button id="savTabActuals" onclick="setSavedTab('actuals')">📑 جمارك</button>
     </div>
     <div class="f"><input id="shipSearch" placeholder="🔍 بحث باسم المورد" oninput="renderSavedTab()" style="margin-bottom:4px"></div>
@@ -659,6 +673,7 @@ section.open .sec-b{display:block}
   <div class="page-h">
     <button class="back" onclick="closeActPage()">→ رجوع</button>
     <h2>📑 جمارك وخرجيات فعلية</h2>
+    <button class="back" style="margin-inline-start:auto;background:#E8A33D;color:#1B2B4B;font-weight:800" onclick="saveShipment();toast('✓ حُفظ البيان')">💾 حفظ</button>
   </div>
   <div class="page-b">
     <div class="hint" style="margin-bottom:10px">سجّل هنا كل ما دُفع فعليًا من وصول البضاعة إلى ميناء جيبوتي حتى وصولها إلى المخازن (بالفرنك DJF). البنود مطابقة لبيان مصروفات وجمارك جريفين أفريكا، ويُحفظ البيان مع الحركة عند الضغط على "حفظ الحركة".</div>
@@ -674,6 +689,10 @@ section.open .sec-b{display:block}
         </div>
         <button class="addrow" onclick="rcFromShipment()" style="margin-top:10px">⬇️ جلب البيانات والأصناف من الحركة الحالية</button>
         <div class="ohead" style="grid-template-columns:24px 1fr 52px 76px 76px 24px"><span>#</span><span style="text-align:right">اسم الصنف</span><span>الكمية</span><span>الإنتاج</span><span>الانتهاء</span><span></span></div>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <button class="addrow" style="margin-top:0;flex:1;border-color:var(--sea);background:#EAF4F9;color:var(--sea)" onclick="rcFromCatalog()">📚 جلب من الكتالوج</button>
+          <button class="addrow" style="margin-top:0;flex:1" onclick="rcFromShipment()">📋 جلب من الدراسة</button>
+        </div>
         <div id="rcItems"></div>
         <button class="addrow" onclick="addRcItem()">＋ إضافة صنف</button>
         <div class="arow grand"><span class="lbl">إجمالي كراتين الأصناف</span><span class="amt-v num" id="rcItemsTotal">0</span></div>
@@ -700,8 +719,10 @@ section.open .sec-b{display:block}
       <div class="sec-b" id="actCompare"></div>
     </section>
 
-    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
-      <button class="addrow" style="margin-top:0;flex:1;min-width:100px;border-color:#1B2B4B;background:#1B2B4B;color:#fff" onclick="saveShipment();toast('✓ حُفظ بيان الجمارك مع الحركة')">💾 حفظ البيان</button>
+    <div class="pageActions">
+      <button class="pa-save" onclick="saveShipment();toast('✓ حُفظ البيان')">💾 حفظ البيان</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
       <button class="addrow" style="margin-top:0;flex:1;min-width:80px" onclick="exportActuals('pdf')">📄 PDF</button>
       <button class="addrow" style="margin-top:0;flex:1;min-width:80px;border-color:var(--gain);background:#EAF7EF;color:#128C4A" onclick="exportActuals('xlsx')">📊 إكسل</button>
       <button class="addrow" style="margin-top:0;flex:1;min-width:100px;border-color:#25D366;background:#E9F9EF;color:#128C4A" onclick="exportActuals('share')">💬 واتساب</button>
@@ -861,17 +882,20 @@ section.open .sec-b{display:block}
   <button class="cancel" onclick="closeSheet()">إلغاء</button>
 </div>
 
+<div class="pageActions">
+  <button class="pa-save" onclick="saveShipment()">💾 حفظ الدراسة</button>
+  <button class="pa-exp" onclick="openSheet()">⬇️ تصدير</button>
+  <button class="pa-new" onclick="newShipment()">＋ دراسة جديدة</button>
+</div>
+
 <!-- حاوية توليد التقارير -->
 <div id="reportHost"></div>
 
 <div class="bbar">
-  <button class="b-new" onclick="newShipment()">＋ جديدة</button>
-  <button class="b-act actuals-only" onclick="openActPage()">📑 جمارك</button>
-  <button class="b-study" onclick="openStudyView()">📋 دراسة</button>
-  <button class="b-pr" onclick="openSheet()">⬇️ تصدير</button>
-  <button class="b-wa profit-only" onclick="showSummary()">📊 ملخص</button>
-  <button class="b-ord" onclick="openOrdPage()">🧾 أوردرات</button>
-  <button class="b-save" onclick="saveShipment()">💾 حفظ</button>
+  <button class="b-study" onclick="openStudyView()">📋 دراسة أصناف</button>
+  <button class="b-new" onclick="scrollToMain()">📊 طريقة 1</button>
+  <button class="b-act" onclick="openActPage()">📑 جمارك فعلية</button>
+  <button class="b-pr" onclick="openSavedPage()">📁 المحفوظات</button>
 </div>
 
 <!-- صفحة دراسة الأصناف (فاتورة + أسعار البيع) -->
@@ -896,6 +920,9 @@ section.open .sec-b{display:block}
       <input id="st_ra" type="number" inputmode="decimal" style="width:70px;padding:6px;border:1.5px solid var(--line);border-radius:8px;text-align:center" oninput="STUDY.ra=this.value;renderStudy()">
     </div>
     <div class="hint" style="margin-bottom:8px">الأسعار تُحسب من التكلفة النهائية (بعد توزيع الشحن والجمارك). عدّل الهامش أو زيادة التجزئة لكل صنف عند الحاجة.</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="addrow" style="margin-top:0;flex:1;border-color:var(--sea);background:#EAF4F9;color:var(--sea)" onclick="studyFromCatalog()">📚 جلب أصناف من الكتالوج</button>
+    </div>
     <div id="studyTable"></div>
 
     <div class="sec-h" style="margin-top:16px;background:#EEF3FA;border-radius:10px;padding:10px 12px"><h2 style="font-size:14px;margin:0">🚢 تكاليف الشحنة (شحن · جمارك · مصاريف)</h2></div>
@@ -911,10 +938,15 @@ section.open .sec-b{display:block}
       <div class="f"><label>الإجمالي النهائي (Fdj)</label><input id="stc_grand" readonly style="background:#EEF3FA;font-weight:800;color:#1B2B4B"></div>
     </div>
 
-    <div style="display:flex;gap:8px;margin-top:12px">
+    <div class="pageActions">
+      <button class="pa-save" onclick="saveShipment();toast('✓ حُفظت الدراسة')">💾 حفظ الدراسة</button>
+      <button class="pa-new" onclick="newShipment();openStudyView()">＋ دراسة جديدة</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
       <button class="addrow" style="margin-top:0" onclick="studyPDF()">📄 PDF</button>
       <button class="addrow" style="margin-top:0;border-color:var(--gain);background:#EAF7EF;color:#128C4A" onclick="studyXLSX()">📊 إكسل</button>
       <button class="addrow" style="margin-top:0;border-color:var(--sea);background:#EAF4F9;color:var(--sea)" onclick="exportStudy('img')">🖼️ صورة</button>
+      <button class="addrow" style="margin-top:0;border-color:#25D366;background:#E9F9EF;color:#128C4A" onclick="exportStudy('img')">💬 واتساب</button>
     </div>
   </div>
 </div>
@@ -926,10 +958,7 @@ section.open .sec-b{display:block}
   <div style="color:#B9C6DD;font-size:13px;font-weight:600">تسجيل الدخول الآمن</div>
   <input id="authVault" style="width:220px;padding:13px;border-radius:12px;border:0;font-size:13px;text-align:center;font-family:inherit;direction:ltr;display:none" placeholder="رمز المزامنة السري (من المدير)">
   <input id="authUsername" autocomplete="username" style="width:220px;padding:13px;border-radius:12px;border:0;font-size:16px;text-align:center;font-family:inherit" placeholder="اسم المستخدم">
-  <div style="position:relative;display:inline-block">
-    <input id="authPassword" type="password" autocomplete="current-password" style="width:220px;padding:13px;border-radius:12px;border:0;font-size:16px;text-align:center;font-family:inherit" placeholder="كلمة المرور">
-    <span id="authPwToggle" onclick="toggleAuthPw()" title="إظهار/إخفاء كلمة المرور" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:18px;user-select:none;line-height:1">👁️</span>
-  </div>
+  <input id="authPassword" type="password" autocomplete="current-password" style="width:220px;padding:13px;border-radius:12px;border:0;font-size:16px;text-align:center;font-family:inherit" placeholder="كلمة المرور">
   <button onclick="doAuthLogin()" style="background:#E8A33D;border:0;border-radius:12px;padding:12px 48px;font-family:'Changa','IBM Plex Sans Arabic',sans-serif;font-weight:800;font-size:16px;color:#1B2B4B;cursor:pointer">دخول</button>
   <div id="authMsg" style="color:#FF9B9B;font-size:13px;min-height:18px;text-align:center;max-width:260px"></div>
   <a id="authVaultToggle" onclick="showVaultField()" style="color:#B9C6DD;font-size:12.5px;text-decoration:underline;cursor:pointer;display:none">إدخال / تغيير رمز المزامنة السري</a>
@@ -945,6 +974,18 @@ section.open .sec-b{display:block}
     <div class="hint" style="margin-bottom:10px">سجّل فواتير الموردين ودفعاتها لتعرف المتبقي لكل مورد وتواريخ الاستحقاق. تُحفظ وتتزامن مع الفريق.</div>
     <button class="addrow" style="margin-top:0;margin-bottom:12px;border-color:#1B2B4B;background:#1B2B4B;color:#fff" onclick="addPayInvoice()">＋ فاتورة مورد جديدة</button>
     <div id="payList"></div>
+  </div>
+</div>
+
+<!-- اختيار أصناف الكتالوج لبيان الاستلام -->
+<div class="page" id="rcPickPage">
+  <div class="page-h">
+    <button class="back" onclick="closeRcPick()">→ رجوع</button>
+    <h2>📚 اختيار أصناف <span class="badge" id="rcPickCount"></span></h2>
+  </div>
+  <div class="page-b">
+    <div id="rcPickGrid"></div>
+    <button class="addrow" style="margin-top:14px;border-color:#1B2B4B;background:#1B2B4B;color:#fff" onclick="rcConfirmPick()">✓ إضافة المختار للبيان</button>
   </div>
 </div>
 
@@ -1386,10 +1427,11 @@ function saveShipment(){
   renderSaved();
   toast(secKey ? '✓ تم الحفظ (مشفّر 🔒)' : '✓ تم حفظ الحركة');
 }
-let savedTab = 'studies';
+let savedTab = 'studies';   /* الأوردرات أُزيلت من الواجهة */
 function setSavedTab(t){
+  if(t==='orders') t='studies';
   savedTab = t;
-  ['studies','orders','actuals'].forEach(x=>{
+  ['studies','actuals'].forEach(x=>{
     const btn=$('savTab'+x.charAt(0).toUpperCase()+x.slice(1));
     if(btn) btn.classList.toggle('on', x===t);
   });
@@ -1843,6 +1885,80 @@ function fillReceipt(){
   rciid = Math.max(0, ...r.items.map(x=>x.id||0));
   renderRcItems();
 }
+/* جلب أصناف بيان الاستلام من كتالوج الموردين (اختيار الشركة ثم أصنافها) */
+function rcFromCatalog(){
+  ensureReceipt();
+  if(!CATALOG.suppliers || CATALOG.suppliers.length===0){ toast('الكتالوج فارغ — أضف موردًا أولًا'); return; }
+  rcPickSup = null; rcPickSel = {};
+  renderRcPick();
+  $('rcPickPage').classList.add('open'); document.body.style.overflow='hidden';
+}
+let rcPickSup=null, rcPickSel={};
+function closeRcPick(){ $('rcPickPage').classList.remove('open'); document.body.style.overflow=''; }
+function rcBackSup(){ rcPickSup=null; renderRcPick(); }
+function rcOpenSup(sid){ rcPickSup=sid; renderRcPick(); }
+function rcToggleItem(sid, idx){
+  const key=sid+'|'+idx;
+  const s=CATALOG.suppliers.find(x=>x.id===sid); if(!s) return;
+  if(rcPickSel[key]) delete rcPickSel[key];
+  else rcPickSel[key]={item:s.items[idx], qty:''};
+  renderRcPick();
+}
+function rcSetQty(sid, idx, v){ const k=sid+'|'+idx; if(rcPickSel[k]) rcPickSel[k].qty=v; }
+function renderRcPick(){
+  let html='';
+  if(!rcPickSup){
+    html='<div class="hint" style="margin-bottom:8px">اختر الشركة:</div><div class="pick-grid">';
+    CATALOG.suppliers.forEach(s=>{
+      if(!s.items||s.items.length===0) return;
+      const n=Object.keys(rcPickSel).filter(k=>k.split('|')[0]===s.id).length;
+      html+=`<div class="pick-card" onclick="rcOpenSup('${s.id}')">
+        ${s.logo?`<img src="${s.logo}" style="height:90px;object-fit:contain;padding:10px;box-sizing:border-box">`:`<div style="height:90px;display:flex;align-items:center;justify-content:center;font-family:'Changa';font-weight:800;font-size:26px;color:var(--sea);background:#F7F9FC">${esc((s.name||'?')[0])}</div>`}
+        <div class="info"><div class="nm">${esc(s.name)}</div><div class="mt">${s.items.length} صنف ${n?'· ✓ '+n:''}</div></div>
+      </div>`;
+    });
+    html+='</div>';
+  } else {
+    const s=CATALOG.suppliers.find(x=>x.id===rcPickSup);
+    if(!s){ rcPickSup=null; renderRcPick(); return; }
+    html=`<button class="addrow" style="margin-top:0;margin-bottom:10px" onclick="rcBackSup()">← رجوع للشركات</button>
+      <div class="sup-head">${s.logo?`<img src="${s.logo}">`:''}${esc(s.name)}</div><div class="pick-grid">`;
+    s.items.forEach((it,idx)=>{
+      const key=s.id+'|'+idx, sel=rcPickSel[key];
+      html+=`<div class="pick-card ${sel?'sel':''}">
+        <div class="chk" onclick="rcToggleItem('${s.id}',${idx})">${sel?'✓':'+'}</div>
+        <img src="${it.img||''}" onclick="rcToggleItem('${s.id}',${idx})" onerror="this.style.background='#F7F9FC'">
+        <div class="info"><div class="nm">${esc(it.name)}</div>
+        <div class="mt">${it.weight?esc(it.weight)+'g':''}${it.pack?' · '+esc(it.pack):''}</div>
+        ${sel?`<input class="qty" type="number" inputmode="numeric" placeholder="الكمية" value="${sel.qty||''}" oninput="rcSetQty('${s.id}',${idx},this.value)">`:''}</div>
+      </div>`;
+    });
+    html+='</div>';
+  }
+  $('rcPickGrid').innerHTML=html;
+  const n=Object.keys(rcPickSel).length;
+  if($('rcPickCount')) $('rcPickCount').textContent = n?'('+n+')':'';
+}
+function rcConfirmPick(){
+  const keys=Object.keys(rcPickSel);
+  if(keys.length===0){ toast('لم تختر أي صنف'); return; }
+  ensureReceipt();
+  const r=actuals.receipt;
+  const firstSid=keys[0].split('|')[0];
+  const sup=CATALOG.suppliers.find(x=>x.id===firstSid);
+  if(sup && sup.name && !r.supplier) r.supplier=sup.name;
+  r.items=r.items.filter(x=>x.name||num(x.qty)>0);
+  let added=0, cartons=0;
+  keys.forEach(k=>{
+    const {item,qty}=rcPickSel[k];
+    r.items.push({id:++rciid, name:item.name, qty:qty||'', prod:'', exp:''});
+    cartons+=num(qty); added++;
+  });
+  if(cartons>0 && !num(r.totalCartons)) r.totalCartons=String(cartons);
+  fillReceipt(); closeRcPick();
+  toast(`✓ أُضيف ${added} صنف من الكتالوج`);
+}
+
 function rcFromShipment(){
   ensureReceipt();
   const r=actuals.receipt;
@@ -2345,6 +2461,21 @@ function updatePickCount(){
 function confirmPick(){
   const keys = Object.keys(pickSelected);
   if(keys.length===0){ toast('لم تختر أي صنف'); return; }
+  if(_pickTarget==='study'){
+    const firstSid=keys[0].split('|')[0];
+    const sup=CATALOG.suppliers.find(s=>s.id===firstSid);
+    if(sup && sup.name && !STUDY.company){ STUDY.company=sup.name; if($('st_company')) $('st_company').value=sup.name; }
+    products=products.filter(p=>p.name||num(p.qty)>0);
+    keys.forEach(k=>{
+      const {item,qty}=pickSelected[k];
+      addProduct({name:item.name, pack:item.pack||'', weight:item.weight||'', qty:qty||'', price:''});
+    });
+    _pickTarget='order';
+    closeCatalogPicker();
+    renderProducts(); calc(); renderStudy();
+    toast(`✓ أُضيف ${keys.length} صنف للدراسة`);
+    return;
+  }
   if(!curOrder) newOrder();
   curOrder.items = curOrder.items.filter(x=>x.name||num(x.qty)>0);
   /* استنتج المورد من أول شركة اخترت منها صنفًا */
@@ -2965,12 +3096,24 @@ function toast(msg){
 }
 
 /* ================= نسخة النظام وسجل التحديثات ================= */
-const APP_VERSION = '2.14.2';
+const APP_VERSION = '3.0.0';
 const AUTH_REQUIRED = true;   /* فرض بوابة الدخول على كل الأجهزة — مبني في النسخة */
 const CHANGELOG = [
-  {v:'2.14.2', date:'2026-08', notes:[
-    'الدخول يقبل البريد الحقيقي (مثل ...@gmail.com) كما هو — لا يُشترط اسم مختصر',
-    'زر 👁️ لإظهار/إخفاء كلمة المرور في شاشة الدخول'
+  {v:'3.0.0', date:'2026-07', notes:[
+    '🎯 إعادة هيكلة كاملة: واجهة أبسط وأثبت',
+    'شريط سفلي من ٤ أزرار: دراسة أصناف · طريقة 1 · جمارك فعلية · المحفوظات',
+    'حفظ وتصدير داخل كل تبويب بما يناسبه (لا تبويب تصدير منفصل)',
+    'إزالة الأوردرات وذمم الموردين من الواجهة (البيانات محفوظة)',
+    'إخفاء بيانات الشحنة مؤقتًا وإزالة زر جديدة من الشريط',
+    'تصميم متجاوب ثابت للجوال والكمبيوتر',
+    'جلب أصناف الكتالوج مباشرة إلى الدراسة',
+    'إصلاح وميض زر الجمارك (ظهور واختفاء)'
+  ]},
+  {v:'2.15.0', date:'2026-07', notes:[
+    'تفعيل التكبير والتصغير باللمس في كل الشاشات',
+    'توازن صفوف الجمارك: البيان يمينًا كاملًا والمبلغ يسارًا',
+    'زر 💾 حفظ ثابت في رأس صفحة جمارك وخرجيات فعلية',
+    '📚 جلب أصناف بيان الاستلام من كتالوج الموردين'
   ]},
   {v:'2.14.1', date:'2026-07', notes:[
     'إصلاح الدخول: يمكن دائمًا إدخال/تصحيح رمز المزامنة من شاشة الدخول',
@@ -3184,11 +3327,7 @@ async function initFirebase(){
 /* ================= المصادقة عبر Firebase Auth (أمان قوي بخادم) =================
    اسم المستخدم يُحوّل داخليًا لبريد وهمي. البيانات لا تُقرأ إلا بعد تسجيل دخول ناجح. */
 const AUTH_DOMAIN_SUFFIX = '@griffin-calc.local';
-function userToEmail(username){
-  const u = String(username||'').trim().toLowerCase().replace(/\s+/g,'');
-  /* إن كتب المستخدم بريدًا حقيقيًا (يحتوي @) استُخدم كما هو؛ وإلا تُضاف اللاحقة الافتراضية */
-  return u.includes('@') ? u : u + AUTH_DOMAIN_SUFFIX;
-}
+function userToEmail(username){ return String(username||'').trim().toLowerCase().replace(/\s+/g,'')+AUTH_DOMAIN_SUFFIX; }
 let authUser = null;   /* مستخدم Firebase المسجّل حاليًا */
 function authEnabled(){ return SETTINGS.authOn==='1'; }
 
@@ -3748,7 +3887,7 @@ function can(perm){
 function applyPerms(){
   document.body.classList.toggle('hide-profit', !can('viewProfit'));
   document.body.classList.toggle('no-delete', !can('deleteData'));
-  document.body.classList.toggle('no-actuals', !can('viewActuals'));
+  document.body.classList.remove('no-actuals');   /* الجمارك متاحة دائمًا — لا وميض */
   if(typeof calc==='function') calc();
   if(typeof renderDashboard==='function') renderDashboard();
 }
@@ -3884,12 +4023,6 @@ function showVaultField(){
   if($('authVaultToggle')) $('authVaultToggle').style.display='none';
 }
 function hideAuthGate(){ $('authGate').style.display='none'; }
-function toggleAuthPw(){
-  const inp=$('authPassword'), ic=$('authPwToggle');
-  if(!inp) return;
-  if(inp.type==='password'){ inp.type='text'; if(ic) ic.textContent='🙈'; }
-  else { inp.type='password'; if(ic) ic.textContent='👁️'; }
-}
 async function doAuthLogin(){
   const u=$('authUsername').value.trim(), p=$('authPassword').value;
   if(!u||!p){ $('authMsg').textContent='أدخل اسم المستخدم وكلمة المرور'; return; }
@@ -4374,6 +4507,21 @@ function nextStudyNo(){
   let maxN=0;
   loadAll().forEach(s=>{ const n=parseInt(s.studyNo); if(isFinite(n)&&n>maxN) maxN=n; });
   return String(maxN+1);
+}
+function studyFromCatalog(){
+  if(!CATALOG.suppliers || CATALOG.suppliers.length===0){ toast('الكتالوج فارغ — أضف موردًا أولًا'); return; }
+  _pickTarget='study';
+  openCatalogPicker();
+}
+let _pickTarget='order';
+function scrollToMain(){
+  ['studyPage','actPage','savedPage','catPage','ordPage','payPage','rcPickPage','pickPage'].forEach(id=>{
+    const el=$(id); if(el) el.classList.remove('open');
+  });
+  document.body.style.overflow='';
+  const sec=document.querySelector('#pCount') ? document.querySelector('#pCount').closest('section') : null;
+  if(sec) sec.scrollIntoView({behavior:'smooth',block:'start'});
+  else window.scrollTo({top:0,behavior:'smooth'});
 }
 function openStudyView(){
   calc();
